@@ -1,4 +1,4 @@
-# BD516 – Lab 05 : Kibana, exploration de données et tableaux de bord
+## BD516 – Lab 05 : Kibana, exploration de données et tableaux de bord
 
 > **Chapitre 5 – Kibana : exploration de données et Discover**
 > Prérequis : Lab 04 terminé (data streams `logs-bd516.app-default` ≈ 50 000 et `logs-bd516.web-default` ≈ 40 000 documents) ; Lab 02 pour les commandes – Durée : 2 h
