@@ -818,8 +818,6 @@ es DELETE /bd516-ha-demo
 
 Résultat attendu : statut **green**, 3 nœuds, 4 copies `STARTED`. Le master reste le nouveau nœud élu : il n'y a pas de retour automatique à l'ancien master.
 
-> Si `docker compose start` affiche `dependency failed to start: container bd516-setup-1 exited (0)`, votre fichier `setup/setup.sh` ne contient pas encore les trois dernières lignes (`sleep 10`) de l'étape 1.1 : ajoutez-les, ou démarrez le conteneur sans passer par les dépendances Compose avec `docker start bd516-${MASTER}-1`.
-
 ---
 
 ## Étape 10 – Repères : ECS et modes de déploiement
