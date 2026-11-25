@@ -26,6 +26,9 @@ cd ~
 rm -Rf ~/BD516
 ```
 ```bash
+sudo apt install jq -y
+```
+```bash
 git clone https://github.com/crystalloide/BD516.git ~/BD516   # ou créer les fichiers avec le Lab 00
 ```
 ```bash
