@@ -841,7 +841,11 @@ GET _cat/nodes?v&h=name,node.role,master,heap.percent,disk.used_percent
 GET _cat/indices?v&expand_wildcards=all&s=index
 ```
 
-Astuces Console : auto-complétion (Ctrl+Espace), indentation (Ctrl+I), historique, et l'icône 🔧 → **Copy as curl** pour obtenir la commande curl équivalente.
+> **Astuces Console** :
+> - auto-complétion (Ctrl+Espace)
+> - indentation (Ctrl+I)
+> - historique
+> - et l'icône 🔧 → **Copy as curl** pour obtenir la commande curl équivalente.
 
 ---
 
