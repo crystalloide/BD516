@@ -577,6 +577,8 @@ Résultat attendu : `65535`, `unlimited`, `5`, `1048576`.
 
 ```bash
 curl -s --cacert ~/BD516/docker/certs/ca/ca.crt https://localhost:9200 ; echo
+```
+```bash
 curl -s --cacert ~/BD516/docker/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" https://localhost:9200 | jq
 ```
 
@@ -588,6 +590,8 @@ La première requête renvoie une erreur **401** (`missing authentication creden
 
 ```bash
 es GET '/_cluster/health?pretty'
+```
+```bash
 es GET '/_cat/health?v'
 ```
 
@@ -603,7 +607,11 @@ Résultat attendu : `"status" : "green"`, `"number_of_nodes" : 3`, `"number_of_d
 
 ```bash
 es GET '/_cat/nodes?v&h=name,ip,node.role,master,heap.max,ram.max,cpu,load_1m&s=name'
+```
+```bash
 es GET '/_cat/master?v'
+```
+```bash
 es GET '/_nodes/es03?filter_path=nodes.*.name,nodes.*.roles&pretty'
 ```
 
@@ -632,7 +640,11 @@ es03 172.x.x.x  cimvw     -      1gb      2gb
 
 ```bash
 es GET '/_cat/allocation?v'
+```
+```bash
 es GET '/_cat/indices?v&expand_wildcards=all&s=index'
+```
+```bash
 es GET '/_cat/shards?v&s=index' | head -20
 ```
 
@@ -669,11 +681,14 @@ Saisissez les requêtes suivantes ; exécutez chacune avec **Ctrl+Entrée** (ou 
 
 ```console
 GET /
-
+```
+```console
 GET _cluster/health
-
+```
+```console
 GET _cat/nodes?v&h=name,node.role,master,heap.percent,disk.used_percent
-
+```
+```console
 GET _cat/indices?v&expand_wildcards=all&s=index
 ```
 
@@ -738,7 +753,11 @@ Testez ses droits avec curl :
 
 ```bash
 curl -s --cacert "$ES_CA" -u analyste:Analyste-BD516 "$ES_URL/_security/_authenticate" | jq '{username, roles}'
+```
+```bash
 curl -s --cacert "$ES_CA" -u analyste:Analyste-BD516 "$ES_URL/_cluster/health" | jq .status
+```
+```bash
 curl -s --cacert "$ES_CA" -u analyste:Analyste-BD516 -X PUT "$ES_URL/bd516-interdit" | jq .error.type
 ```
 
@@ -785,6 +804,8 @@ Redémarrez le nœud et constatez le retour au vert :
 
 ```bash
 cd ~/BD516/docker
+```
+```bash
 docker compose start "${MASTER}"
 sleep 45
 es GET '/_cluster/health?filter_path=status,number_of_nodes,unassigned_shards'
@@ -813,11 +834,23 @@ GET _component_template/ecs@mappings?filter_path=component_templates.name,compon
 
 ```bash
 cd ~/BD516/docker
+```
+```bash
 docker compose ps -a                 # état des services
+```
+```bash
 docker compose logs -f --tail 50 es01
+```
+```bash
 docker compose stop                  # arrêt (données conservées)
+```
+```bash
 docker compose start                 # redémarrage
+```
+```bash
 docker compose down                  # suppression des conteneurs (volumes conservés)
+```
+```bash
 ~/BD516/scripts/reset-lab.sh         # remise à zéro TOTALE (conteneurs, volumes, certificats)
 ```
 
