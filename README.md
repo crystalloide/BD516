@@ -22,6 +22,7 @@ Travaux pratiques de la formation **BD516** (2 jours, 14 h) : indexer, recherche
 ## Démarrage rapide
 
 ```bash
+cd ~
 rm -Rf ~/BD516
 ```
 ```bash
