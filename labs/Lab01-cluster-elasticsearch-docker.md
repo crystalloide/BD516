@@ -481,8 +481,6 @@ Contrôlez la configuration finale interprétée par Compose (variables substitu
 ```bash
 cd ~/BD516/docker
 docker compose config --quiet && echo "docker-compose.yml valide"
-```
-```bash
 docker compose config --services
 ```
 
@@ -494,11 +492,7 @@ Résultat attendu : `docker-compose.yml valide` puis `setup`, `es01`, `es02`, `e
 
 ```bash
 cd ~/BD516/docker
-```
-```bash
 docker compose up -d              # rend la main quand Kibana peut démarrer (1 à 3 min au premier lancement)
-```
-```bash
 docker compose logs setup         # doit se terminer par "Termine : certificats en place et kibana_system configure."
 ```
 
@@ -506,8 +500,6 @@ Suivez la montée en charge (1 à 3 minutes selon le poste) :
 
 ```bash
 cd ~/BD516/docker
-```
-```bash
 watch -n 5 docker compose ps -a
 ```
 
@@ -536,14 +528,13 @@ Les logs Elasticsearch sont au format JSON (ECS). Repérez les messages clés du
 
 ```bash
 cd ~/BD516/docker
-docker compose logs es01 2>&1 | grep -E "non-loopback|master node changed|_FINISH_ELECTION_|\"started|health status changed" | cut -c1-260
+docker compose logs es01 2>&1 | grep -E "non-loopback|master node changed|\"started|health status changed" | cut -c1-260
 ```
 
 | Message | Signification |
 |---|---|
 | `bound or publishing to a non-loopback address, enforcing bootstrap checks` | mode production : les *bootstrap checks* (mémoire virtuelle, memory lock, descripteurs…) sont **bloquants** |
-| `_FINISH_ELECTION_ ... completing election` | ce nœud vient d'être **élu master** (n'apparaît que sur le nœud élu) |
-| `master node changed {previous [], current [{es0X}...]}` | le nœud a rejoint le cluster et connaît le master |
+| `master node changed {previous [], current [{es0X}...]}` | le nœud a rejoint le cluster ; le nom placé après `current` est le **master élu** (message présent sur les 3 nœuds) |
 | `started {es01}{...}` | le nœud est démarré et accepte les requêtes |
 | `Cluster health status changed from [YELLOW] to [GREEN]` | toutes les copies de shards sont allouées (affiché par le master) |
 
@@ -551,14 +542,23 @@ Trouvez le nœud élu :
 
 ```bash
 cd ~/BD516/docker
-```
-```bash
 for n in es01 es02 es03; do
-  printf '%s : ' "$n"; docker compose logs "$n" 2>&1 | grep -c "_FINISH_ELECTION_"
+  printf '%s -> master : ' "$n"
+  docker compose logs "$n" 2>&1 | grep -o 'current \[{es0[1-3]}' | tail -1 | sed -E 's/.*\{(es0[1-3])\}/\1/'
 done
 ```
 
-Le nœud affichant un compteur non nul est le master (es03, *voting_only*, n'est jamais élu) ; l'API `_cat/master` de l'étape 5 donne la même information. La commande Docker équivalente `docker logs bd516-es01-1` fonctionne aussi.
+Résultat attendu : les trois nœuds désignent **le même master**, es01 ou es02 selon l'ordre de démarrage (es03, *voting_only*, n'est jamais élu). Par exemple :
+
+```text
+es01 -> master : es02
+es02 -> master : es02
+es03 -> master : es02
+```
+
+`tail -1` retient le dernier changement de master connu de chaque nœud (utile après la bascule de l'étape 9). L'API `_cat/master` de l'étape 5 donne la même information, et la commande Docker équivalente `docker logs bd516-es01-1` fonctionne aussi.
+
+> Ne cherchez pas le master avec le marqueur interne `_FINISH_ELECTION_` : il peut figurer dans les logs de plusieurs nœuds et ne désigne donc pas le nœud élu de façon fiable.
 
 Vérifiez que les réglages de production sont actifs **dans** le conteneur :
 
@@ -577,8 +577,6 @@ Résultat attendu : `65535`, `unlimited`, `5`, `1048576`.
 
 ```bash
 curl -s --cacert ~/BD516/docker/certs/ca/ca.crt https://localhost:9200 ; echo
-```
-```bash
 curl -s --cacert ~/BD516/docker/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" https://localhost:9200 | jq
 ```
 
@@ -590,8 +588,6 @@ La première requête renvoie une erreur **401** (`missing authentication creden
 
 ```bash
 es GET '/_cluster/health?pretty'
-```
-```bash
 es GET '/_cat/health?v'
 ```
 
@@ -607,11 +603,7 @@ Résultat attendu : `"status" : "green"`, `"number_of_nodes" : 3`, `"number_of_d
 
 ```bash
 es GET '/_cat/nodes?v&h=name,ip,node.role,master,heap.max,ram.max,cpu,load_1m&s=name'
-```
-```bash
 es GET '/_cat/master?v'
-```
-```bash
 es GET '/_nodes/es03?filter_path=nodes.*.name,nodes.*.roles&pretty'
 ```
 
@@ -640,11 +632,7 @@ es03 172.x.x.x  cimvw     -      1gb      2gb
 
 ```bash
 es GET '/_cat/allocation?v'
-```
-```bash
 es GET '/_cat/indices?v&expand_wildcards=all&s=index'
-```
-```bash
 es GET '/_cat/shards?v&s=index' | head -20
 ```
 
@@ -681,14 +669,11 @@ Saisissez les requêtes suivantes ; exécutez chacune avec **Ctrl+Entrée** (ou 
 
 ```console
 GET /
-```
-```console
+
 GET _cluster/health
-```
-```console
+
 GET _cat/nodes?v&h=name,node.role,master,heap.percent,disk.used_percent
-```
-```console
+
 GET _cat/indices?v&expand_wildcards=all&s=index
 ```
 
