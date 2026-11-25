@@ -1,4 +1,4 @@
-# BD516 – Lab 00 : préparation du poste stagiaire
+## BD516 – Lab 00 : préparation du poste stagiaire
 
 > **Formation BD516 – Elastic Stack : Elasticsearch, Logstash et Kibana**
 > Projet / dépôt GitHub : **BD516** – Versions : **Elastic Stack 9.5.7**, Docker Engine 29.x (dépôt officiel), Ubuntu 24.04 LTS
