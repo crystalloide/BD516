@@ -26,6 +26,7 @@ rm -Rf ~/BD516
 ```
 ```bash
 git clone https://github.com/<compte>/BD516.git ~/BD516   # ou créer les fichiers avec le Lab 00
+```
 ```bash
 cd ~/BD516
 ./scripts/check-prereqs.sh          # prérequis (Lab 00)
