@@ -1,4 +1,4 @@
-## BD516 – Lab 03 : recherche avec le Query DSL et agrégations
+## BD516– Lab 03 : recherche avec le Query DSL et agrégations
 
 > **Chapitre 3 – Recherche avec Query DSL et agrégations**
 > Prérequis : Lab 02 terminé (`bd516-orders` : 10 000 commandes ; alias `bd516-products` → `bd516-products-v2` : 500 produits, soldes appliquées sur la catégorie Ski) – Durée : 2 h 30

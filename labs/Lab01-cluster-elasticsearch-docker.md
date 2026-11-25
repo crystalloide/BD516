@@ -1,4 +1,4 @@
-## BD516 – Lab 01 : démarrer un cluster Elasticsearch sécurisé avec Docker Compose
+## BD516– Lab 01 : démarrer un cluster Elasticsearch sécurisé avec Docker Compose
 
 > **Chapitre 1 – Introduction à Elastic Stack et architecture d'Elasticsearch**
 > Prérequis : Lab 00 terminé (`./scripts/check-prereqs.sh` sans erreur) – Durée : 1 h 30

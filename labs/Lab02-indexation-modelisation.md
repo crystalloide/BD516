@@ -1,4 +1,4 @@
-## BD516 – Lab 02 : indexation et modélisation des données
+## BD516– Lab 02 : indexation et modélisation des données
 
 > **Chapitre 2 – Indexation et modélisation des données**
 > Prérequis : Lab 01 terminé (cluster **green**, Kibana accessible) – Durée : 2 h 30

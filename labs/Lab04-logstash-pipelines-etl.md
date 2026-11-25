@@ -1,4 +1,4 @@
-## BD516 – Lab 04 : Logstash, architecture et pipelines ETL
+## BD516– Lab 04 : Logstash, architecture et pipelines ETL
 
 > **Chapitre 4 – Logstash : architecture et pipelines ETL**
 > Prérequis : Lab 01 terminé (cluster green) ; Labs 02-03 conseillés – Durée : 2 h 30

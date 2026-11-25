@@ -1,4 +1,4 @@
-## BD516 – Elastic Stack : Elasticsearch, Logstash et Kibana
+# BD516 – Elastic Stack : Elasticsearch, Logstash et Kibana
 
 Travaux pratiques de la formation **BD516** (2 jours, 14 h) : indexer, rechercher, transformer et visualiser des données avec la suite Elastic.
 
@@ -29,6 +29,9 @@ git clone https://github.com/crystalloide/BD516.git ~/BD516   # ou créer les fi
 ```
 ```bash
 cd ~/BD516
+find . \( -name '*.sh' -o -path '*/generators/*.py' \) -exec chmod +x {} +   # droits d'exécution
+```
+```bash
 ./scripts/check-prereqs.sh          # prérequis (Lab 00)
 ```
 ```bash

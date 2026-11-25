@@ -215,7 +215,7 @@ Deux possibilités :
 git clone https://github.com/crystalloide/BD516.git ~/BD516
 ```
 
-  Les fichiers des étapes 6.1 à 6.5 sont alors déjà présents : passez directement à la fin de l'étape 6 (`chmod` et `~/.bashrc`).
+  Les fichiers des étapes 6.1 à 6.6 sont alors déjà présents : passez directement à la fin de l'étape 6 (`chmod` et `~/.bashrc`).
 
 - **sinon**, créez l'arborescence vous-même ; tous les fichiers sont fournis dans les labs :
 
@@ -523,10 +523,26 @@ echo "Environnement reinitialise. Redemarrage : cd ~/BD516/docker && docker comp
 BD516_EOF
 ```
 
-Rendez les scripts exécutables et chargez les fonctions d'aide à chaque ouverture de terminal :
+### 6.6 Fichier `.gitattributes` (fins de ligne Unix, même après un passage par Windows)
 
 ```bash
-chmod +x ~/BD516/scripts/*.sh
+cat > ~/BD516/.gitattributes <<'BD516_EOF'
+# BD516 - fins de ligne Unix obligatoires pour les fichiers executes sous Linux
+# (evite l'erreur "/usr/bin/env: 'bash\r': No such file or directory" apres un passage par Windows)
+* text=auto eol=lf
+*.sh   text eol=lf
+*.py   text eol=lf
+*.conf text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+*.zip  binary
+BD516_EOF
+```
+
+Rendez les scripts exécutables (indispensable aussi après un `git clone` ou une décompression d'archive faite depuis Windows) et chargez les fonctions d'aide à chaque ouverture de terminal :
+
+```bash
+find ~/BD516 \( -name '*.sh' -o -path '*/generators/*.py' \) -exec chmod +x {} +
 grep -q 'BD516/scripts/bd516-env.sh' ~/.bashrc || \
   echo '[ -f ~/BD516/scripts/bd516-env.sh ] && source ~/BD516/scripts/bd516-env.sh' >> ~/.bashrc
 source ~/.bashrc
@@ -588,6 +604,8 @@ git push -u origin main
 | Symptôme | Cause / solution |
 |---|---|
 | `ps -p 1` n'affiche pas `systemd` (WSL) | `/etc/wsl.conf` absent ou incorrect → étape 1B puis `wsl --shutdown` |
+| `./scripts/...: Permission denied` | droits d'exécution perdus (archive ou dépôt passé par Windows) → `chmod +x` de la fin de l'étape 6 |
+| `/usr/bin/env: 'bash\r': No such file or directory` | fins de ligne Windows (CRLF) → `sed -i 's/\r$//' ~/BD516/scripts/*.sh ~/BD516/docker/setup/setup.sh` |
 | `permission denied ... /var/run/docker.sock` | groupe `docker` non pris en compte → `newgrp docker` ou nouvelle session |
 | `vm.max_map_count` revient à 65530 (WSL) | ligne `kernelCommandLine` absente de `.wslconfig`, puis `wsl --shutdown` |
 | `docker pull` très lent / refusé | proxy d'entreprise : configurez `HTTPS_PROXY` pour le démon Docker (`systemctl edit docker`) |
