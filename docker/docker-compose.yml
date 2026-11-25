@@ -1,0 +1,252 @@
+# =============================================================================
+# BD516 - Elastic Stack : Elasticsearch, Logstash et Kibana
+# Cluster de formation "proche production" :
+#   - 3 noeuds Elasticsearch, securite activee, TLS sur HTTP et transport
+#   - roles differencies (es03 = voting_only + tiers warm/cold) pour ILM
+#   - Kibana en HTTPS
+#   - Logstash (profil "logstash", Lab 04) et Metricbeat (profil "monitoring")
+# Toutes les valeurs variables sont dans le fichier .env (scripts/init-env.sh)
+# =============================================================================
+name: bd516
+
+x-es-common: &es-common
+  image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+  restart: unless-stopped
+  mem_limit: ${ES_MEM_LIMIT}
+  ulimits:
+    memlock:
+      soft: -1
+      hard: -1
+    nofile:
+      soft: 65535
+      hard: 65535
+  sysctls:
+    net.ipv4.tcp_retries2: 5
+  networks:
+    - elastic
+  healthcheck:
+    test: ["CMD-SHELL", "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'"]
+    interval: 10s
+    timeout: 10s
+    retries: 120
+    start_period: 30s
+
+x-es-env: &es-env
+  cluster.name: ${CLUSTER_NAME}
+  cluster.initial_master_nodes: es01,es02,es03
+  ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+  bootstrap.memory_lock: "true"
+  path.repo: /usr/share/elasticsearch/snapshots
+  xpack.security.enabled: "true"
+  xpack.security.http.ssl.enabled: "true"
+  xpack.security.http.ssl.certificate_authorities: certs/ca/ca.crt
+  xpack.security.transport.ssl.enabled: "true"
+  xpack.security.transport.ssl.certificate_authorities: certs/ca/ca.crt
+  xpack.security.transport.ssl.verification_mode: certificate
+  xpack.license.self_generated.type: ${LICENSE}
+  xpack.ml.use_auto_machine_memory_percent: "true"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Initialisation : certificats TLS + mot de passe kibana_system
+  # ---------------------------------------------------------------------------
+  setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    user: "0"
+    command: ["bash", "/setup/setup.sh"]
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      KIBANA_PASSWORD: ${KIBANA_PASSWORD}
+      CERT_SAN_DNS: ${CERT_SAN_DNS:-}
+      CERT_SAN_IPS: ${CERT_SAN_IPS:-}
+    volumes:
+      - ./setup/setup.sh:/setup/setup.sh:ro
+      - ./certs:/usr/share/elasticsearch/config/certs
+      - snapshots:/usr/share/elasticsearch/snapshots
+    networks:
+      - elastic
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/certs.ready"]
+      interval: 2s
+      timeout: 5s
+      retries: 150
+
+  # ---------------------------------------------------------------------------
+  # Noeuds Elasticsearch
+  # ---------------------------------------------------------------------------
+  es01:
+    <<: *es-common
+    depends_on:
+      setup:
+        condition: service_healthy
+    hostname: es01
+    ports:
+      - "${BIND_IP}:9200:9200"
+    volumes:
+      - ./certs:/usr/share/elasticsearch/config/certs:ro
+      - esdata01:/usr/share/elasticsearch/data
+      - snapshots:/usr/share/elasticsearch/snapshots
+    environment:
+      <<: *es-env
+      node.name: es01
+      node.roles: master,data_content,data_hot,ingest,ml,remote_cluster_client,transform
+      discovery.seed_hosts: es02,es03
+      xpack.security.http.ssl.key: certs/es01/es01.key
+      xpack.security.http.ssl.certificate: certs/es01/es01.crt
+      xpack.security.transport.ssl.key: certs/es01/es01.key
+      xpack.security.transport.ssl.certificate: certs/es01/es01.crt
+
+  es02:
+    <<: *es-common
+    depends_on:
+      setup:
+        condition: service_healthy
+    hostname: es02
+    ports:
+      - "${BIND_IP}:9201:9200"
+    volumes:
+      - ./certs:/usr/share/elasticsearch/config/certs:ro
+      - esdata02:/usr/share/elasticsearch/data
+      - snapshots:/usr/share/elasticsearch/snapshots
+    environment:
+      <<: *es-env
+      node.name: es02
+      node.roles: master,data_content,data_hot,ingest,ml,remote_cluster_client,transform
+      discovery.seed_hosts: es01,es03
+      xpack.security.http.ssl.key: certs/es02/es02.key
+      xpack.security.http.ssl.certificate: certs/es02/es02.crt
+      xpack.security.transport.ssl.key: certs/es02/es02.key
+      xpack.security.transport.ssl.certificate: certs/es02/es02.crt
+
+  es03:
+    <<: *es-common
+    depends_on:
+      setup:
+        condition: service_healthy
+    hostname: es03
+    ports:
+      - "${BIND_IP}:9202:9200"
+    volumes:
+      - ./certs:/usr/share/elasticsearch/config/certs:ro
+      - esdata03:/usr/share/elasticsearch/data
+      - snapshots:/usr/share/elasticsearch/snapshots
+    environment:
+      <<: *es-env
+      node.name: es03
+      # noeud "voting_only" : vote pour l'election du master mais ne peut pas etre elu
+      node.roles: master,voting_only,data_warm,data_cold,ingest
+      discovery.seed_hosts: es01,es02
+      xpack.security.http.ssl.key: certs/es03/es03.key
+      xpack.security.http.ssl.certificate: certs/es03/es03.crt
+      xpack.security.transport.ssl.key: certs/es03/es03.key
+      xpack.security.transport.ssl.certificate: certs/es03/es03.crt
+
+  # ---------------------------------------------------------------------------
+  # Kibana (HTTPS)
+  # ---------------------------------------------------------------------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      es01:
+        condition: service_healthy
+      es02:
+        condition: service_healthy
+      es03:
+        condition: service_healthy
+    hostname: kibana
+    mem_limit: ${KB_MEM_LIMIT}
+    ports:
+      - "${BIND_IP}:5601:5601"
+    environment:
+      KIBANA_PASSWORD: ${KIBANA_PASSWORD}
+      KIBANA_PUBLIC_URL: ${KIBANA_PUBLIC_URL}
+      KIBANA_ENC_KEY: ${KIBANA_ENC_KEY}
+      KIBANA_REPORTING_KEY: ${KIBANA_REPORTING_KEY}
+      KIBANA_SECURITY_KEY: ${KIBANA_SECURITY_KEY}
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - ./certs:/usr/share/kibana/config/certs:ro
+      - kibanadata:/usr/share/kibana/data
+    networks:
+      - elastic
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' --cacert /usr/share/kibana/config/certs/ca/ca.crt https://localhost:5601/ | grep -q 302"]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # Logstash (Lab 04) - active avec COMPOSE_PROFILES=logstash dans .env
+  # ---------------------------------------------------------------------------
+  logstash:
+    profiles: ["logstash"]
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      es01:
+        condition: service_healthy
+    hostname: logstash
+    mem_limit: ${LS_MEM_LIMIT}
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      LS_JAVA_OPTS: "-Xms${LS_HEAP} -Xmx${LS_HEAP}"
+      LOGSTASH_WRITER_PASSWORD: ${LOGSTASH_WRITER_PASSWORD}
+    ports:
+      - "127.0.0.1:9600:9600"
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./logstash/dev:/usr/share/logstash/dev:ro
+      - ./certs:/usr/share/logstash/config/certs:ro
+      - ../data/logs:/data/logs:ro
+      - logstashdata:/usr/share/logstash/data
+    networks:
+      - elastic
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -f http://localhost:9600/ > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # Metricbeat (bonus Lab 04) - supervision de Logstash, profil "monitoring"
+  # ---------------------------------------------------------------------------
+  metricbeat:
+    profiles: ["monitoring"]
+    image: docker.elastic.co/beats/metricbeat:${STACK_VERSION}
+    restart: unless-stopped
+    depends_on:
+      es01:
+        condition: service_healthy
+    hostname: metricbeat
+    command: ["-environment", "container", "-e", "--strict.perms=false"]
+    environment:
+      MONITORING_PASSWORD: ${MONITORING_PASSWORD}
+    volumes:
+      - ./metricbeat/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - ./certs:/usr/share/metricbeat/certs:ro
+    networks:
+      - elastic
+
+networks:
+  elastic:
+    driver: bridge
+
+volumes:
+  esdata01:
+  esdata02:
+  esdata03:
+  snapshots:
+  kibanadata:
+  logstashdata:

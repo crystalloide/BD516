@@ -1,0 +1,22 @@
+# =============================================================================
+# BD516 - Metricbeat : supervision de Logstash (bonus Lab 04)
+# Collecte l'API _node/stats de Logstash et envoie les donnees au format
+# "Stack Monitoring" (index .monitoring-logstash-*) du cluster BD516.
+# =============================================================================
+metricbeat.modules:
+  - module: logstash
+    xpack.enabled: true
+    period: 10s
+    hosts: ["http://logstash:9600"]
+
+output.elasticsearch:
+  hosts: ["https://es01:9200", "https://es02:9200", "https://es03:9200"]
+  username: "remote_monitoring_user"
+  password: "${MONITORING_PASSWORD}"
+  ssl.certificate_authorities: ["/usr/share/metricbeat/certs/ca/ca.crt"]
+
+# Les donnees de supervision ont leurs propres modeles : pas de template ni d'ILM Metricbeat
+setup.template.enabled: false
+setup.ilm.enabled: false
+monitoring.enabled: false
+logging.level: info

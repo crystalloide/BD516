@@ -1,0 +1,21 @@
+# =============================================================================
+# BD516 - pipelines.yml : une instance Logstash, plusieurs pipelines isoles
+# Chaque pipeline a ses propres workers, sa propre file d'attente et
+# peut etre recharge independamment des autres.
+# =============================================================================
+
+# Logs applicatifs Java (API shop-api) : file d'attente PERSISTANTE sur disque
+- pipeline.id: bd516-app
+  path.config: "/usr/share/logstash/pipeline/bd516-app/*.conf"
+  pipeline.workers: 2
+  pipeline.batch.size: 250
+  queue.type: persisted
+  queue.max_bytes: 512mb
+  dead_letter_queue.enable: true
+
+# Logs d'acces nginx : file d'attente en memoire (par defaut)
+- pipeline.id: bd516-web
+  path.config: "/usr/share/logstash/pipeline/bd516-web/*.conf"
+  pipeline.workers: 1
+  pipeline.batch.size: 250
+  queue.type: memory

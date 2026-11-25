@@ -1,0 +1,28 @@
+# =============================================================================
+# BD516 - logstash.yml (parametres globaux de l'instance)
+# Monte en lecture seule : ne definissez PAS de variables d'environnement
+# portant le nom d'un parametre Logstash (ex. PIPELINE_WORKERS) dans docker-compose.
+# =============================================================================
+node.name: logstash-bd516
+
+# API de supervision (_node/stats, _node/pipelines, _health_report...)
+api.http.host: "0.0.0.0"
+api.http.port: 9600
+
+# Schema ECS (Elastic Common Schema) pour tous les plugins
+pipeline.ecs_compatibility: v8
+
+# Rechargement automatique des pipelines modifies (sans redemarrage).
+# Valeur surchargeable par la variable LS_CONFIG_RELOAD (false pour les tests ponctuels
+# avec "docker compose run" : sinon Logstash ne s'arrete pas a la fin de l'entree stdin).
+config.reload.automatic: "${LS_CONFIG_RELOAD:true}"
+config.reload.interval: 5s
+
+# Arret propre : Logstash vide ses files d'attente avant de s'arreter
+pipeline.unsafe_shutdown: false
+
+# Le monitoring "legacy" interne est desactive : la supervision de production
+# se fait avec Metricbeat (module logstash) ou Elastic Agent.
+xpack.monitoring.enabled: false
+
+log.level: info

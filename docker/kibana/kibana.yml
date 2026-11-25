@@ -1,0 +1,33 @@
+# =============================================================================
+# BD516 - Configuration Kibana (montee en lecture seule dans le conteneur)
+# Les valeurs ${VAR} sont substituees par Kibana a partir des variables
+# d'environnement du conteneur (elles-memes issues du fichier .env).
+# =============================================================================
+server.name: kibana
+server.host: "0.0.0.0"
+server.shutdownTimeout: "5s"
+# URL publique : utilisee dans les liens de partage et les rapports
+server.publicBaseUrl: "${KIBANA_PUBLIC_URL}"
+
+# --- HTTPS cote navigateur ---------------------------------------------------
+server.ssl.enabled: true
+server.ssl.certificate: /usr/share/kibana/config/certs/kibana/kibana.crt
+server.ssl.key: /usr/share/kibana/config/certs/kibana/kibana.key
+
+# --- Connexion au cluster (les 3 noeuds, TLS verifie par la CA) --------------
+elasticsearch.hosts: ["https://es01:9200", "https://es02:9200", "https://es03:9200"]
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "${KIBANA_PASSWORD}"
+elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/ca/ca.crt"]
+elasticsearch.ssl.verificationMode: full
+
+# --- Cles de chiffrement (obligatoires en production, >= 32 caracteres) -------
+xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_ENC_KEY}"
+xpack.reporting.encryptionKey: "${KIBANA_REPORTING_KEY}"
+xpack.security.encryptionKey: "${KIBANA_SECURITY_KEY}"
+
+# --- Divers -------------------------------------------------------------------
+monitoring.ui.container.elasticsearch.enabled: true
+telemetry.optIn: false
+# Interface en francais : decommentez la ligne suivante (les labs citent les libelles anglais)
+#i18n.locale: "fr-FR"
