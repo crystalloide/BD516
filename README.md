@@ -25,7 +25,7 @@ Travaux pratiques de la formation **BD516** (2 jours, 14 h) : indexer, recherche
 rm -Rf ~/BD516
 ```
 ```bash
-git clone https://github.com/<compte>/BD516.git ~/BD516   # ou créer les fichiers avec le Lab 00
+git clone https://github.com/xrystalloide/BD516.git ~/BD516   # ou créer les fichiers avec le Lab 00
 ```
 ```bash
 cd ~/BD516
