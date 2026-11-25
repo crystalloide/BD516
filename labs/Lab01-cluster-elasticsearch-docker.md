@@ -158,6 +158,9 @@ for attempt in $(seq 1 60); do
 done
 
 log "Termine : certificats en place et kibana_system configure."
+# Reste actif quelques secondes pour que Docker Compose constate l'etat "healthy"
+# (redemarrage d'un seul noeud alors que le cluster repond deja)
+sleep 10
 BD516_EOF
 chmod +x ~/BD516/docker/setup/setup.sh
 ```
@@ -577,8 +580,6 @@ Résultat attendu : `65535`, `unlimited`, `5`, `1048576`.
 
 ```bash
 curl -s --cacert ~/BD516/docker/certs/ca/ca.crt https://localhost:9200 ; echo
-```
-```bash
 curl -s --cacert ~/BD516/docker/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" https://localhost:9200 | jq
 ```
 
@@ -590,41 +591,10 @@ La première requête renvoie une erreur **401** (`missing authentication creden
 
 ```bash
 es GET '/_cluster/health?pretty'
-```
-Résultat attendu :
-
-```text
-{
-  "cluster_name" : "bd516-cluster",
-  "status" : "green",
-  "timed_out" : false,
-  "number_of_nodes" : 3,
-  "number_of_data_nodes" : 3,
-  "active_primary_shards" : 51,
-  "active_shards" : 102,
-  "relocating_shards" : 0,
-  "initializing_shards" : 0,
-  "unassigned_shards" : 0,
-  "unassigned_primary_shards" : 0,
-  "delayed_unassigned_shards" : 0,
-  "number_of_pending_tasks" : 0,
-  "number_of_in_flight_fetch" : 0,
-  "task_max_waiting_in_queue_millis" : 0,
-  "active_shards_percent_as_number" : 100.0
-}
-```
-
-```bash
 es GET '/_cat/health?v'
 ```
-Résultat attendu :
 
-```text
-epoch      timestamp cluster       status node.total node.data shards pri relo init unassign unassign.pri pending_tasks max_task_wait_time active_shards_percent
-1795645462 22:24:22  bd516-cluster green           3         3    102  51    0    0        0            0             0                  -                100.0%
-```
-
-Explication du résultat attendu : `"status" : "green"`, `"number_of_nodes" : 3`, `"number_of_data_nodes" : 3`, `"unassigned_shards" : 0`.
+Résultat attendu : `"status" : "green"`, `"number_of_nodes" : 3`, `"number_of_data_nodes" : 3`, `"unassigned_shards" : 0`.
 
 | Couleur | Signification |
 |---|---|
@@ -636,15 +606,17 @@ Explication du résultat attendu : `"status" : "green"`, `"number_of_nodes" : 3`
 
 ```bash
 es GET '/_cat/nodes?v&h=name,ip,node.role,master,heap.max,ram.max,cpu,load_1m&s=name'
+es GET '/_cat/master?v'
+es GET '/_nodes/es03?filter_path=nodes.*.name,nodes.*.roles&pretty'
 ```
 
 Résultat attendu :
 
 ```text
-name ip         node.role master heap.max ram.max cpu load_1m
-es01 172.18.0.3 hilmrst   -           1gb     2gb   1    0.30
-es02 172.18.0.4 hilmrst   *           1gb     2gb   1    0.30
-es03 172.18.0.5 cimvw     -           1gb     2gb   1    0.30
+name ip         node.role master heap.max ram.max ...
+es01 172.x.x.x  hilmrst   *      1gb      2gb
+es02 172.x.x.x  hilmrst   -      1gb      2gb
+es03 172.x.x.x  cimvw     -      1gb      2gb
 ```
 
 (le `*` désigne le master ; les tailles dépendent du profil mémoire choisi par `init-env.sh`)
@@ -657,144 +629,14 @@ es03 172.18.0.5 cimvw     -           1gb     2gb   1    0.30
 | i | ingest | l | ml (machine learning) |
 | r | remote_cluster_client | t | transform |
 
-> **Nœud « coordinating »** : tout nœud coordonne les requêtes qu'il reçoit (répartition sur les shards, fusion des résultats).
-> Un nœud *coordinating-only* a simplement `node.roles: [ ]`.
-
-
-```bash
-es GET '/_cat/master?v'
-```
-
-Résultat attendu :
-
-```text
-id                     host       ip         node
-0Rp46cHjSqO_VI_5CKd0dA 172.18.0.4 172.18.0.4 es02
-```
-
-```bash
-es GET '/_nodes/es03?filter_path=nodes.*.name,nodes.*.roles&pretty'
-```
-
-Résultat attendu :
-
-```text
-{
-  "nodes" : {
-    "SmiyxI5kTiqSRzi2l__GJA" : {
-      "name" : "es03",
-      "roles" : [
-        "data_cold",
-        "data_warm",
-        "ingest",
-        "master",
-        "voting_only"
-      ]
-    }
-  }
-}
-```
-
+> **Nœud « coordinating »** : tout nœud coordonne les requêtes qu'il reçoit (répartition sur les shards, fusion des résultats). Un nœud *coordinating-only* a simplement `node.roles: [ ]`.
 
 ### 5.4 Allocation, index et shards
 
 ```bash
 es GET '/_cat/allocation?v'
-```
-Résultat attendu :
-
-```text
-shards shards.undesired write_load.forecast disk.indices.forecast disk.indices disk.used disk.avail disk.total disk.percent host       ip         node node.role
-    51                0                 0.0                 4.4mb        4.4mb    96.9gb    909.8gb   1006.8gb            9 172.18.0.3 172.18.0.3 es01 hilmrst
-     0                0                 0.0                    0b           0b    96.9gb    909.8gb   1006.8gb            9 172.18.0.5 172.18.0.5 es03 cimvw
-    51                0                 0.0                 4.5mb        4.5mb    96.9gb    909.8gb   1006.8gb            9 172.18.0.4 172.18.0.4 es02 hilmrst
-```
-
-
-```bash
 es GET '/_cat/indices?v&expand_wildcards=all&s=index'
-```
-
-```text
-health status index                                                              uuid                   pri rep docs.count docs.deleted store.size pri.store.size dataset.size
-green  open   .apm-agent-configuration                                           NlvuOsz4QxijH9JQXjstjA   1   1          0            0       498b           249b         249b
-green  open   .apm-custom-link                                                   nD1q0VtfRIyQ6z1BBTO6gg   1   1          0            0       498b           249b         249b
-green  open   .apm-source-map                                                    gXmYSaVzSWmJ5TDP_ZLVmg   1   1          0            0       498b           249b         249b
-green  open   .cases                                                             AISLFUTkR7qY7MIcLUddZA   1   1          0            0       498b           249b         249b
-green  open   .cases-activity                                                    VxB3WxLjQBCQxv42WITPMg   1   1          0            0       498b           249b         249b
-green  open   .cases-attachments                                                 fZCQ1CJHQLasWxmNJmfyOQ   1   1          0            0       498b           249b         249b
-green  open   .ds-.alert-actions-2026.11.25-000001                               _9DtSxGIQU6s89ELfDwTLA   1   1          0            0       498b           249b         249b
-green  open   .ds-.edr-workflow-insights-default-2026.11.25-000001               XTDsZ-VvQbGMmEFRNGuykg   1   1          0            0       498b           249b         249b
-green  open   .ds-.kibana-event-log-ds-2026.11.25-000001                         yhN7FIVVTTu4egbc6CB64w   1   1       1363            0      1.3mb        686.3kb      686.3kb
-green  open   .ds-.kibana_change_history-2026.11.25-000001                       8Lzd55sxSxKNnGfsScb3cQ   1   1          0            0       498b           249b         249b
-green  open   .ds-.logs-elasticsearch.deprecation-default-2026.11.25-000001      QIvWdktUQZ6EvSVfmhSNEA   1   1          9            0     78.9kb         39.2kb       39.2kb
-green  open   .ds-.rule-events-2026.11.25-000001                                 JAvtWaKsTXWQi_lKIlostg   1   1          0            0       498b           249b         249b
-green  open   .ds-.slo-observability.health-v3.6-2026.11.25-000001               xeXHRHbISVO0uhymRzOPWA   1   1          0            0       498b           249b         249b
-green  open   .ds-.workflows-events-2026.11.25-000001                            PZ0eH9ObTuuP0tl6A6Cn2Q   1   1          0            0       498b           249b         249b
-green  open   .ds-ilm-history-7-2026.11.25-000001                                q4tq80WmQP-S4kyTOAXbrg   1   1         48            0     58.5kb         29.2kb       29.2kb
-green  open   .entity_analytics.watchlists.default                               YX1Iue6RSgyx1FZuT7XdVw   1   1          0            0       498b           249b         249b
-green  open   .inference                                                         q_M1bBx7QteC_F8nlomL2w   1   1          3            0     29.2kb           21kb         21kb
-green  open   .internal.alerts-dataset.quality.alerts-default-000001             U1OYCc8tQu2ypoiK8MkiAQ   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-default.alerts-default-000001                     tGi6SIFsSsCaI-Kdyc1qaQ   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-ml.anomaly-detection-health.alerts-default-000001 UTFsPjuoSwCEUndOksWAbA   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-ml.anomaly-detection.alerts-default-000001        b6gSTOtlSBaeLDwxaub2oA   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-observability.apm.alerts-default-000001           p-CogdXdSVSMD8d2H64Bbg   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-observability.logs.alerts-default-000001          d_zks10AS7CPko6btHK92A   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-observability.metrics.alerts-default-000001       -Viy_hXDRCKpPCUFxXwCeA   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-observability.slo.alerts-default-000001           ROfmsR0mTDKYkDMZqF3Nnw   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-observability.threshold.alerts-default-000001     Es4jE2xdQDeHfU0bxLaGLQ   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-observability.uptime.alerts-default-000001        sP38ZcJqTcKeGvjG0LwBBA   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-security.alerts-default-000001                    XOIzHqFnQDuMRbsOo09SrA   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-security.attack.discovery.alerts-default-000001   jOOhTmYaQFKRakr4x65tMA   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-stack.alerts-default-000001                       eLb0izcXTrKrlSRmZzDpUQ   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-streams.alerts-default-000001                     QyywxNzTQXyK7GHnWO8cSg   1   1          0            0       498b           249b         249b
-green  open   .internal.alerts-transform.health.alerts-default-000001            EzVJt0f7T-uKqUsYAYEwaw   1   1          0            0       498b           249b         249b
-green  open   .kibana-siem-rule-migrations-integrations                          i9gw5ZiMTwioA3ujNXvMmQ   1   1          0            0       498b           249b         249b
-green  open   .kibana-siem-rule-migrations-prebuiltrules                         hceHeofGRNWADaV6MRo4ZA   1   1          0            0       498b           249b         249b
-green  open   .kibana_9.5.7_001                                                  XyKGvV9oRg65s5g1_0DVbg   1   1          6            0     76.8kb         34.9kb       34.9kb
-green  open   .kibana_alerting_cases_9.5.7_001                                   FUV5xvt3QQylBlBAAtGiUQ   1   1          2            0     37.7kb         18.8kb       18.8kb
-green  open   .kibana_analytics_9.5.7_001                                        mqLSx5DvRVKf-lweRDBxaA   1   1          5            0      3.5mb          1.7mb        1.7mb
-green  open   .kibana_ingest_9.5.7_001                                           -gljCKIhQG252ObN_OJSqA   1   1        143          144        1mb        616.3kb      616.3kb
-green  open   .kibana_locks-000001                                               oIwNZmPGQeuFKz9Se1P2tw   1   1          0            0       53kb         13.2kb       13.2kb
-green  open   .kibana_search_solution_9.5.7_001                                  bg9LSGC1Rmespv-3VoQQTw   1   1          0            0       498b           249b         249b
-green  open   .kibana_security_session_1                                         lNFBOhMbSPmwihFfcf1W3A   1   1          0            0       498b           249b         249b
-green  open   .kibana_security_solution_9.5.7_001                                _AivNYyZSoayMsqARvheXQ   1   1          8            7     43.8kb         21.9kb       21.9kb
-green  open   .kibana_streams-000001                                             HXuB6oz-R62bBXiiXkN-8w   1   1          2            0     15.1kb          7.5kb        7.5kb
-green  open   .kibana_task_manager_9.5.7_001                                     NQlMN98vTd2WfbC1MlRd-w   1   1         67           19    406.9kb        203.2kb      203.2kb
-green  open   .kibana_usage_counters_9.5.7_001                                   rjXdySSuRbeZgbkWT8qKUA   1   1          9            0    104.3kb         52.2kb       52.2kb
-green  open   .secrets-inference                                                 meQgV3FHTASyqrExEF6yLg   1   1          3            0     15.4kb         11.3kb       11.3kb
-green  open   .security-7                                                        aOfrS6h-Tvqa9yX4pJHpLA   1   1        356            0      2.2mb          1.1mb        1.1mb
-green  open   .slo-observability.composite-summary-v1                            1cTdyqQ-QlCQA5B44gZ8wQ   1   1          0            0       498b           249b         249b
-green  open   .slo-observability.sli-v3.6                                        pJIGt4sURVm9RRZX-sLaRQ   1   1          0            0       498b           249b         249b
-green  open   .slo-observability.summary-v3.6                                    0yneGtZZTu-1Z5MWwKD8lQ   1   1          0            0       498b           249b         249b
-green  open   .slo-observability.summary-v3.6.temp                               KgRbCiiGTV-uIhhXp9cmfA   1   1          0            0       498b           249b         249b
-```
-
-```bash
 es GET '/_cat/shards?v&s=index' | head -20
-```
-
-```text
-index                                                              shard prirep state   docs   store dataset ip         node
-.apm-agent-configuration                                           0     r      STARTED    0    249b    249b 172.18.0.3 es01
-.apm-agent-configuration                                           0     p      STARTED    0    249b    249b 172.18.0.4 es02
-.apm-custom-link                                                   0     p      STARTED    0    249b    249b 172.18.0.3 es01
-.apm-custom-link                                                   0     r      STARTED    0    249b    249b 172.18.0.4 es02
-.apm-source-map                                                    0     r      STARTED    0    249b    249b 172.18.0.3 es01
-.apm-source-map                                                    0     p      STARTED    0    249b    249b 172.18.0.4 es02
-.cases                                                             0     r      STARTED    0    249b    249b 172.18.0.3 es01
-.cases                                                             0     p      STARTED    0    249b    249b 172.18.0.4 es02
-.cases-activity                                                    0     p      STARTED    0    249b    249b 172.18.0.3 es01
-.cases-activity                                                    0     r      STARTED    0    249b    249b 172.18.0.4 es02
-.cases-attachments                                                 0     p      STARTED    0    249b    249b 172.18.0.3 es01
-.cases-attachments                                                 0     r      STARTED    0    249b    249b 172.18.0.4 es02
-.ds-.alert-actions-2026.11.25-000001                               0     p      STARTED    0    249b    249b 172.18.0.3 es01
-.ds-.alert-actions-2026.11.25-000001                               0     r      STARTED    0    249b    249b 172.18.0.4 es02
-.ds-.edr-workflow-insights-default-2026.11.25-000001               0     r      STARTED    0    249b    249b 172.18.0.3 es01
-.ds-.edr-workflow-insights-default-2026.11.25-000001               0     p      STARTED    0    249b    249b 172.18.0.4 es02
-.ds-.kibana-event-log-ds-2026.11.25-000001                         0     p      STARTED 1363 686.3kb 686.3kb 172.18.0.3 es01
-.ds-.kibana-event-log-ds-2026.11.25-000001                         0     r      STARTED 1363 686.3kb 686.3kb 172.18.0.4 es02
-.ds-.kibana_change_history-2026.11.25-000001                       0     r      STARTED    0    249b    249b 172.18.0.3 es01
 ```
 
 Les index système (préfixe `.`, cachés) existent déjà : sécurité, Kibana, etc. Observez que leurs shards sont uniquement sur **es01/es02** : es03 n'a pas le rôle `data_content`.
@@ -830,22 +672,15 @@ Saisissez les requêtes suivantes ; exécutez chacune avec **Ctrl+Entrée** (ou 
 
 ```console
 GET /
-```
-```console
+
 GET _cluster/health
-```
-```console
+
 GET _cat/nodes?v&h=name,node.role,master,heap.percent,disk.used_percent
-```
-```console
+
 GET _cat/indices?v&expand_wildcards=all&s=index
 ```
 
-> **Astuces Console** :
-> - auto-complétion (Ctrl+Espace)
-> - indentation (Ctrl+I)
-> - historique
-> - et l'icône 🔧 → **Copy as curl** pour obtenir la commande curl équivalente.
+Astuces Console : auto-complétion (Ctrl+Espace), indentation (Ctrl+I), historique, et l'icône 🔧 → **Copy as curl** pour obtenir la commande curl équivalente.
 
 ---
 
@@ -906,11 +741,7 @@ Testez ses droits avec curl :
 
 ```bash
 curl -s --cacert "$ES_CA" -u analyste:Analyste-BD516 "$ES_URL/_security/_authenticate" | jq '{username, roles}'
-```
-```bash
 curl -s --cacert "$ES_CA" -u analyste:Analyste-BD516 "$ES_URL/_cluster/health" | jq .status
-```
-```bash
 curl -s --cacert "$ES_CA" -u analyste:Analyste-BD516 -X PUT "$ES_URL/bd516-interdit" | jq .error.type
 ```
 
@@ -940,6 +771,20 @@ Résultat attendu : `"authentication_type": "api_key"`. Les clés sont visibles 
 
 ## Étape 9 – Tolérance aux pannes : perte du master
 
+Les index système (`.security`, `.kibana`…) sont créés avec `auto_expand_replicas: 0-1` : leur nombre de réplicas s'adapte au nombre de nœuds éligibles, si bien qu'ils restent **green** même lorsqu'il ne reste qu'un nœud `data_content`. Pour observer l'effet d'une panne sur des données, créez d'abord un index métier de 2 shards avec 1 réplica :
+
+```bash
+cd ~/BD516/docker
+es PUT /bd516-ha-demo -d '{"settings":{"number_of_shards":2,"number_of_replicas":1}}'
+for i in 1 2 3 4; do es POST /bd516-ha-demo/_doc -d "{\"msg\":\"document ${i}\"}" > /dev/null; done
+es POST /bd516-ha-demo/_refresh > /dev/null
+es GET '/_cat/shards/bd516-ha-demo?v&h=index,shard,prirep,state,node&s=shard,prirep'
+```
+
+Résultat attendu : 4 copies `STARTED` (2 primaires `p`, 2 réplicas `r`) réparties sur es01 et es02.
+
+Arrêtez maintenant le master et interrogez le cluster par un nœud restant :
+
 ```bash
 cd ~/BD516/docker
 MASTER=$(es GET '/_cat/master?h=node' | tr -d '[:space:]'); echo "Master actuel : ${MASTER}"
@@ -949,20 +794,31 @@ docker compose stop "${MASTER}"
 sleep 30
 ES_URL=${SURVIVANT} es GET '/_cat/nodes?v&h=name,node.role,master'
 ES_URL=${SURVIVANT} es GET '/_cluster/health?filter_path=status,number_of_nodes,unassigned_shards'
+ES_URL=${SURVIVANT} es GET '/_cat/shards/bd516-ha-demo?v&h=index,shard,prirep,state,node&s=shard,prirep'
+ES_URL=${SURVIVANT} es GET '/bd516-ha-demo/_count'
 ```
 
-Résultat attendu : 2 nœuds, **un nouveau master** (es01 ou es02, jamais es03), statut **yellow** : les réplicas des index système ne peuvent pas être réalloués (seuls es01 et es02 portent le rôle `data_content`, et deux copies d'un même shard ne cohabitent jamais sur un même nœud). Les données restent disponibles : les réplicas ont été **promus primaires**.
+Résultat attendu :
 
-Redémarrez le nœud et constatez le retour au vert :
+- 2 nœuds et **un nouveau master** (es01 ou es02, jamais es03 qui est *voting_only*) ;
+- statut **yellow**, `unassigned_shards: 2` : les deux réplicas de `bd516-ha-demo` ne peuvent pas être réalloués, car seuls es01 et es02 portent le rôle `data_content` et deux copies d'un même shard ne cohabitent jamais sur un même nœud ;
+- les deux primaires sont sur le nœud restant (les réplicas ont été **promus primaires**) et `count: 4` : aucune donnée n'est perdue.
+
+Redémarrez le nœud, constatez le retour au vert, puis supprimez l'index de démonstration :
 
 ```bash
 cd ~/BD516/docker
-```
-```bash
 docker compose start "${MASTER}"
 sleep 45
 es GET '/_cluster/health?filter_path=status,number_of_nodes,unassigned_shards'
+es GET '/_cat/shards/bd516-ha-demo?v&h=index,shard,prirep,state,node&s=shard,prirep'
+es GET '/_cat/master?v'
+es DELETE /bd516-ha-demo
 ```
+
+Résultat attendu : statut **green**, 3 nœuds, 4 copies `STARTED`. Le master reste le nouveau nœud élu : il n'y a pas de retour automatique à l'ancien master.
+
+> Si `docker compose start` affiche `dependency failed to start: container bd516-setup-1 exited (0)`, votre fichier `setup/setup.sh` ne contient pas encore les trois dernières lignes (`sleep 10`) de l'étape 1.1 : ajoutez-les, ou démarrez le conteneur sans passer par les dépendances Compose avec `docker start bd516-${MASTER}-1`.
 
 ---
 
@@ -987,23 +843,11 @@ GET _component_template/ecs@mappings?filter_path=component_templates.name,compon
 
 ```bash
 cd ~/BD516/docker
-```
-```bash
 docker compose ps -a                 # état des services
-```
-```bash
 docker compose logs -f --tail 50 es01
-```
-```bash
 docker compose stop                  # arrêt (données conservées)
-```
-```bash
 docker compose start                 # redémarrage
-```
-```bash
 docker compose down                  # suppression des conteneurs (volumes conservés)
-```
-```bash
 ~/BD516/scripts/reset-lab.sh         # remise à zéro TOTALE (conteneurs, volumes, certificats)
 ```
 
@@ -1015,6 +859,7 @@ docker compose down                  # suppression des conteneurs (volumes conse
 | `memory locking requested for elasticsearch process but memory is not locked` | `ulimits memlock` absent du Compose ou démon Docker restreint ; vérifier l'étape 4 |
 | Code de sortie 137 (`docker compose ps -a`) | conteneur tué faute de mémoire : RAM de la VM/WSL insuffisante, profil plus petit (`./scripts/init-env.sh --force` après `reset-lab.sh`) |
 | Kibana `unhealthy` / « Kibana server is not ready yet » | patientez 2 min ; sinon `docker compose logs kibana \| grep -i error` |
+| `dependency failed to start: container bd516-setup-1 exited (0)` au redémarrage d'un nœud | `setup.sh` sans le `sleep 10` final (étape 1.1) ; contournement : `docker start bd516-es0X-1` |
 | `setup` en erreur `impossible de definir le mot de passe kibana_system` | `ELASTIC_PASSWORD` modifié après le premier démarrage : il n'est lu qu'une fois → `reset-lab.sh` |
 | `curl: (60) SSL certificate problem` | option `--cacert ~/BD516/docker/certs/ca/ca.crt` oubliée |
 | Statut yellow durable sur un poste dont le disque est plein à plus de 85 % | *disk watermark* : libérez de l'espace ou agrandissez le disque |
@@ -1025,4 +870,4 @@ docker compose down                  # suppression des conteneurs (volumes conse
 - [x] Messages de démarrage clés identifiés (bootstrap checks, élection, started)
 - [x] API `_cluster/health`, `_cat/*` maîtrisées avec curl et la console Dev Tools
 - [x] Rôle `bd516_analyst`, utilisateur `analyste` et clé d'API créés et testés
-- [x] Bascule du master observée et retour au vert
+- [x] Bascule du master observée (yellow sans perte de données) et retour au vert

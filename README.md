@@ -22,11 +22,7 @@ Travaux pratiques de la formation **BD516** (2 jours, 14 h) : indexer, recherche
 ## Démarrage rapide
 
 ```bash
-cd ~
 rm -Rf ~/BD516
-```
-```bash
-sudo apt install jq -y
 ```
 ```bash
 git clone https://github.com/crystalloide/BD516.git ~/BD516   # ou créer les fichiers avec le Lab 00
