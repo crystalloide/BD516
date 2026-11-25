@@ -809,14 +809,18 @@ Redémarrez le nœud, constatez le retour au vert, puis supprimez l'index de dé
 ```bash
 cd ~/BD516/docker
 docker compose start "${MASTER}"
-sleep 45
-es GET '/_cluster/health?filter_path=status,number_of_nodes,unassigned_shards'
+# Attente du retour au vert (3 minutes au plus), en interrogeant le noeud reste actif
+ES_URL=${SURVIVANT} es GET '/_cluster/health?wait_for_nodes=3&wait_for_status=green&timeout=180s&filter_path=status,number_of_nodes,unassigned_shards,timed_out'
 es GET '/_cat/shards/bd516-ha-demo?v&h=index,shard,prirep,state,node&s=shard,prirep'
 es GET '/_cat/master?v'
 es DELETE /bd516-ha-demo
 ```
 
-Résultat attendu : statut **green**, 3 nœuds, 4 copies `STARTED`. Le master reste le nouveau nœud élu : il n'y a pas de retour automatique à l'ancien master.
+Résultat attendu : statut **green**, 3 nœuds, `unassigned_shards: 0`, `timed_out: false`, puis 4 copies `STARTED`. La réponse arrive dès le retour au vert, en général après 1 à 2 minutes : le nœud redémarre, puis les réplicas sont reconstruits, y compris ceux des index système, qui repassent de 0 à 1 réplica (2 reconstructions simultanées par nœud par défaut). Le master reste le nouveau nœud élu : il n'y a pas de retour automatique à l'ancien master.
+
+> Un statut **yellow** juste après le redémarrage est donc normal ; s'il persiste au-delà de 3 minutes (`timed_out: true`), consultez `es GET '/_cat/recovery?v&active_only=true'` et `es GET '/_cluster/allocation/explain?filter_path=index,shard,allocate_explanation'`.
+
+> Si `docker compose start` affiche `dependency failed to start: container bd516-setup-1 exited (0)`, votre fichier `setup/setup.sh` ne contient pas encore les trois dernières lignes (`sleep 10`) de l'étape 1.1 : ajoutez-les, ou démarrez le conteneur sans passer par les dépendances Compose avec `docker start bd516-${MASTER}-1`.
 
 ---
 
